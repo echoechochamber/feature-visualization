@@ -127,6 +127,7 @@ void CvVisualizer::update(ofImage img)
             cv::resize(single_feature, single_feature, cv::Size(), resize_storage_factor, resize_storage_factor);
             for(int i = 0; i < (int)current_rects.size(); i++){
                 rect_data local = current_rects[i];
+                // NOTE: vvv This is the draw logic that they're using - adapt this to fit your needs
 //                if(draw_planes){
 //                    if(local.weight >= 0){
 //                        rectangle(single_feature, Rect(local.x * resize_storage_factor, local.y * resize_storage_factor, local.w * resize_storage_factor, local.h * resize_storage_factor), Scalar(0), CV_FILLED);
