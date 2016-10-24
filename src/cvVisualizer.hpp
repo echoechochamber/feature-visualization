@@ -12,12 +12,14 @@
 #ifndef cvVisualizer_hpp
 #define cvVisualizer_hpp
 
+#include "ofMain.h"
 #include <stdio.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "ofxCv.h"
 
+#include <typeinfo>
 #include <fstream>
 #include <iostream>
 
@@ -25,30 +27,35 @@
 
 class CvVisualizer : public ofBaseApp {
 public:
-    struct rect_data{
+    void setup(string modelName);
+    void update(ofImage img);
+    void draw();
+    void drawStage(int stage_num);
+    int numStages; 
+    
+    cv::FileStorage fs;
+    cv::FileNode cascade,stages,features, feature_trees;
+    
+    string output_folder;
+    string image_ref;
+    int resize_width;
+    int resize_height;
+    struct rect_data {
         int x;
         int y;
         int w;
         int h;
-        float weight;
+        int weight;
     };
-    void setup(string modelName, string outputFolder);
-    void update(ofImage img);
-    void draw();
-    //    vector<Rect> current_rect;
-    
-    cv::FileStorage fs;
-    cv::FileNode cascade,stages,features;
-    
-    string model;
-    string output_folder;
-    string image_ref;
-    int resize_factor;
-    int resize_storage_factor;
-    
-    vector< vector< rect_data > > feature_data;
+    vector< vector< rect_data > > stage_feature_data;
+    vector< vector<  vector< rect_data > > > all_stages;
     cv::Mat reference_image, visualization;
     
+    const int x=0;
+    const int y=1;
+    const int w=2;
+    const int h=3;
+    const int wt=4;
     
 };
 

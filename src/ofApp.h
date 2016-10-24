@@ -2,6 +2,7 @@
 
 #include "ofMain.h"
 #include "ofxCv.h"
+#include <cvVisualizer.hpp>
 
 class ofApp : public ofBaseApp{
 
@@ -19,5 +20,5 @@ class ofApp : public ofBaseApp{
         
         ofFbo fbo;
         ofxCv::ObjectFinder finder;
-
+        CvVisualizer cv;
 };

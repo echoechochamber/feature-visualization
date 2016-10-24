@@ -12,164 +12,115 @@ using namespace std;
 using namespace cv;
 //--------------------------------//
 //--------------------------------//
-
-void CvVisualizer::setup(string modelName, string outputFolder){
+// NOTE: for now you need to give the absolute path
+void CvVisualizer::setup(string modelName){
+    //     Open the XML model
+    fs.open(ofToDataPath(modelName), FileStorage::READ);
+    string testStr ;
+    if(fs.isOpened()){
+        testStr = "fs is open";
+    }else {
+        testStr = "fs is not open";
+    }
+//    cout << testStr << endl;
     
+    //     open the cascade xml - this logic is specially required for opencv cascades
+    string tmpName = modelName.substr(0, modelName.length()-4);
+    cascade = fs[tmpName];
+    int tmp = cascade["size"][0];
+//    cout << "tmp is equal to : " << tmp << endl;
+    resize_width = tmp;
+    resize_height = tmp;
     
-    model = modelName;
-    output_folder = outputFolder;
-    
-    
-    // Value for cols of storing elements
-    int cols_prefered = 5;
-    
-    // Open the XML model
-    
-    fs.open(model, FileStorage::READ);
-    
-    // Get a the required information
-    cascade = fs["cascade"];
-    
-    
-    // We make a visualisation mask - which increases the window to make it at least a bit more visible
-    resize_factor = 10;
-    resize_storage_factor = 10;
-    
-    
-    
-    // First recover for each stage the number of weak features and their index
-    // Important since it is NOT sequential when using LBP features
-    // NOTE: do I need this for the
-    
-    vector< vector<int> > stage_features;
-    FileNode stages = cascade["stages"];
+    stages = cascade["stages"];
     FileNodeIterator it_stages = stages.begin(), it_stages_end = stages.end();
-    int idx = 0;
-    for( ; it_stages != it_stages_end; it_stages++, idx++ ){
-        vector<int> current_feature_indexes;
-        FileNode weak_classifiers = (*it_stages)["weakClassifiers"];
-        FileNodeIterator it_weak = weak_classifiers.begin(), it_weak_end = weak_classifiers.end();
-        vector<int> values;
-        for(int idy = 0; it_weak != it_weak_end; it_weak++, idy++ ){
-            (*it_weak)["internalNodes"] >> values;
-            current_feature_indexes.push_back( (int)values[2] );
-        }
-        stage_features.push_back(current_feature_indexes);
-    }
     
-    // If the output option has been chosen than we will store a combined image plane for
-    // each stage, containing all weak classifiers for that stage.
-    // bool draw_planes = false;
-    // stringstream output_video;
-    // output_video << output_folder << "model_visualization.avi";
-    // VideoWriter result_video;
-    // if( output_folder.compare("") != 0 ){
-    // 	draw_planes = true;
-    // 	result_video.open(output_video.str(), CV_FOURCC('X','V','I','D'), 15, Size(reference_image.cols * resize_factor, reference_image.rows * resize_factor), false);
-    // }
-    
-    // Grab the corresponding features dimensions and weights
-    FileNode features = cascade["features"];
-    vector< vector< rect_data > > feature_data;
-    FileNodeIterator it_features = features.begin(), it_features_end = features.end();
-    for(int idf = 0; it_features != it_features_end; it_features++, idf++ ){
-        vector< rect_data > current_feature_rectangles;
-        FileNode rectangles = (*it_features)["rects"];
-        int nrects = (int)rectangles.size();
-        for(int k = 0; k < nrects; k++){
-            rect_data current_data;
-            FileNode single_rect = rectangles[k];
-            current_data.x = (int)single_rect[0];
-            current_data.y = (int)single_rect[1];
-            current_data.w = (int)single_rect[2];
-            current_data.h = (int)single_rect[3];
-            current_data.weight = (float)single_rect[4];
-            current_feature_rectangles.push_back(current_data);
+    //     here declare a vector of vv stage feature data rects  that will hopld the data by stage.
+    for( int idx = 0; it_stages != it_stages_end; it_stages++, idx++ ){
+        vector< vector< rect_data > > stage_feature_data;
+        FileNode feature_trees = (*it_stages)["trees"];
+        int num_trees = feature_trees.size();
+        
+        for(int idy = 0; idy < num_trees; idy++ ){
+            vector< rect_data > current_feature_rectangles; // create a vector of rect data
+            for(int idz = 0; idz < 2; idz++){
+                // grab the data for each rect
+                FileNode single_rect = feature_trees[idy][0]["feature"]["rects"][idz];
+                rect_data current_data;
+                current_data.x = (int)single_rect[x] * resize_width;
+                current_data.y = (int)single_rect[y] * resize_height;
+                current_data.w = (int)single_rect[w] * resize_width;
+                current_data.h = (int)single_rect[h] * resize_height;
+                current_data.weight = (float)single_rect[wt];
+                current_feature_rectangles.push_back(current_data);
+            }
+            
+            stage_feature_data.push_back(current_feature_rectangles);
         }
-        feature_data.push_back(current_feature_rectangles);
+        all_stages.push_back(stage_feature_data);
     }
+//    cout << typeid(stage_feature_data[0][0]).name() << endl;
 }
 //--------------------------------//
 //--------------------------------//
 void CvVisualizer::update(ofImage img)
 {
-    // convert the input image to gray and convert gray image to
+    //     convert the input image to gray and convert gray image to
     ofPixels gray;
     ofxCv::convertColor(img, gray, CV_RGB2GRAY);
     reference_image = ofxCv::toCv(gray);
-    // reference_image = imread(image_ref, CV_LOAD_IMAGE_GRAYSCALE);
     
-    resize(reference_image, visualization, cv::Size(reference_image.cols * resize_factor, reference_image.rows * resize_factor), 0, 0, CV_INTER_CUBIC);
-    vector< vector<int> > stage_features;
-    
-    Mat image_plane;
-    Mat metadata = Mat::zeros(150, 1000, CV_8UC1);
-    vector< rect_data > current_rects;
-    for(int sid = 0; sid < (int)stage_features.size(); sid ++){
-//        if(draw_planes){
-//            int features = stage_features[sid].size();
-//            int cols = cols_prefered;
-//            int rows = features / cols;
-//            if( (features % cols) > 0){
-//                rows++;
-//            }
-//            image_plane = Mat::zeros(reference_image.rows * resize_storage_factor * rows, reference_image.cols * resize_storage_factor * cols, CV_8UC1);
-//        }
-        for(int fid = 0; fid < (int)stage_features[sid].size(); fid++){
-            stringstream meta1, meta2;
-            meta1 << "Stage " << sid << " / Feature " << fid;
-            meta2 << "Rectangles: ";
-            Mat temp_window = visualization.clone();
-            Mat temp_metadata = metadata.clone();
-            int current_feature_index = stage_features[sid][fid];
-            current_rects = feature_data[current_feature_index];
-            Mat single_feature = reference_image.clone();
-            cv::resize(single_feature, single_feature, cv::Size(), resize_storage_factor, resize_storage_factor);
-            for(int i = 0; i < (int)current_rects.size(); i++){
-                rect_data local = current_rects[i];
-                // NOTE: vvv This is the draw logic that they're using - adapt this to fit your needs
-//                if(draw_planes){
-//                    if(local.weight >= 0){
-//                        rectangle(single_feature, Rect(local.x * resize_storage_factor, local.y * resize_storage_factor, local.w * resize_storage_factor, local.h * resize_storage_factor), Scalar(0), CV_FILLED);
-//                    }else{
-//                        rectangle(single_feature, Rect(local.x * resize_storage_factor, local.y * resize_storage_factor, local.w * resize_storage_factor, local.h * resize_storage_factor), Scalar(255), CV_FILLED);
-//                    }
-//                }
-                
-                cv::Rect part(local.x * resize_factor, local.y * resize_factor, local.w * resize_factor, local.h * resize_factor);
-                meta2 << part << " (w " << local.weight << ") ";
-                if(local.weight >= 0){
-                    rectangle(temp_window, part, Scalar(0), CV_FILLED);
-                }else{
-                    rectangle(temp_window, part, Scalar(255), CV_FILLED);
-                }
-            }
-            imshow("features", temp_window);
-
-            
-            // Copy the feature image if needed
-//            if(draw_planes){
-//                single_feature.copyTo(image_plane(Rect(0 + (fid%cols_prefered)*single_feature.cols, 0 + (fid/cols_prefered) * single_feature.rows, single_feature.cols, single_feature.rows)));
-//            }
-
-            imshow("metadata", temp_metadata);
-        }
-        //Store the stage image if needed
-//        if(draw_planes){
-//            stringstream save_location;
-//            save_location << output_folder << "stage_" << sid << ".png";
-//            imwrite(save_location.str(), image_plane);
-//        }
-    }
 }
 //--------------------------------//
 //--------------------------------//
 void CvVisualizer::draw(){
+    ofBackground(0);
+    
     // Read in the input arguments
+    for(int idx = 0; idx < stages.size(); idx++){
+        for(int idy = 0; idy < all_stages[idx].size() ; idy++){
+            for(int idz = 0; idz < all_stages[idx][idy].size(); idz++){
+                ofSetColor(255, 255, 255);
+                
+                if(all_stages[idx][idy][idz].weight > 0.0){
+                    
+                    ofFill();
+                } else {
+                    ofNoFill();
+                }
+                ofDrawRectangle((float)all_stages[idx][idy][idz].x,(float)all_stages[idx][idy][idz].y,(float)all_stages[idx][idy][idz].w,(float)all_stages[idx][idy][idz].h);
+            }
+            
+        }
+        
+    }
 }
 
 //------------------------------------------------------------------------------------------------//
+//--------------------------------//
+void CvVisualizer::drawStage(int stage_num){
+    ofBackground(0);
+
+        for(int idy = 0; idy < all_stages[stage_num].size() ; idy++){
+            for(int idz = 0; idz < all_stages[stage_num][idy].size(); idz++){
+                ofSetColor(255, 255, 255);
+                if(all_stages[stage_num][idy][idz].weight > 0.0){
+                    
+                    ofFill();
+                } else {
+                    ofNoFill();
+                }
+                ofDrawRectangle((float)all_stages[stage_num][idy][idz].x,(float)all_stages[stage_num][idy][idz].y,(float)all_stages[stage_num][idy][idz].w,(float)all_stages[stage_num][idy][idz].h);
+            }
+            
+        }
+        
+    }
+}
 //------------------------------------------------------------------------------------------------//
+int CvVisualizer::numStages(){
+    return all_stages.size();
+}
 //------------------------------------------------------------------------------------------------//
 //------------------------------------------------------------------------------------------------//
 
