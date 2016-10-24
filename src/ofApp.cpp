@@ -21,7 +21,7 @@ void ofApp::setup(){
 void ofApp::update() {
     cam.update();
     if( cam.isFrameNew() ) {
-        //         finder.update(cam);
+//        finder.update(cam);
     }
 }
 
@@ -29,29 +29,24 @@ void ofApp::update() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-    //    fbo.begin();
-    
-    //    ofPushStyle();
-    //    ofFill();
-    //    for(int i = 0; i < finder.size(); i++) {
-    //        ofBeginShape();
-    //        ofRectangle object = finder.getObjectSmoothed(i);
-    //        ofDrawRectangle(object);
-    //        ofEndShape(true);
-    //    }
-    //    ofPopStyle();
-    //    fbo.end();
-    //    cam.draw(0,0);
-    //    cam.getTexture().setAlphaMask(fbo.getTexture());
-    cv.draw();
+
+//    cv.draw();
+    cv.drawStage(stage_to_draw);
 }
 
 //--------------------------------------------------------------
-// update the app
-void ofApp::updatePictures(int key){
-    ofLog(OF_LOG_NOTICE, "the number is " + ofToString(key));
+
+
+void ofApp::keyPressed(int key){
+    if(key == OF_KEY_LEFT){
+        if(stage_to_draw > 0 ){
+            stage_to_draw = stage_to_draw - 1;
+        }
+    }else if(key == OF_KEY_RIGHT){
+        if(stage_to_draw < cv.numStages() - 1){
+            stage_to_draw = stage_to_draw + 1; 
+        }
+    }
 }
-
-
 
 

@@ -22,15 +22,15 @@ void CvVisualizer::setup(string modelName){
     }else {
         testStr = "fs is not open";
     }
-//    cout << testStr << endl;
+    //    cout << testStr << endl;
     
     //     open the cascade xml - this logic is specially required for opencv cascades
     string tmpName = modelName.substr(0, modelName.length()-4);
     cascade = fs[tmpName];
     int tmp = cascade["size"][0];
-//    cout << "tmp is equal to : " << tmp << endl;
-    resize_width = tmp;
-    resize_height = tmp;
+    //    cout << "tmp is equal to : " << tmp << endl;
+    resize_width = ofGetWidth() / (tmp+1);
+    resize_height = ofGetHeight() / (tmp+1);
     
     stages = cascade["stages"];
     FileNodeIterator it_stages = stages.begin(), it_stages_end = stages.end();
@@ -59,7 +59,7 @@ void CvVisualizer::setup(string modelName){
         }
         all_stages.push_back(stage_feature_data);
     }
-//    cout << typeid(stage_feature_data[0][0]).name() << endl;
+    //    cout << typeid(stage_feature_data[0][0]).name() << endl;
 }
 //--------------------------------//
 //--------------------------------//
@@ -100,21 +100,24 @@ void CvVisualizer::draw(){
 //--------------------------------//
 void CvVisualizer::drawStage(int stage_num){
     ofBackground(0);
-
-        for(int idy = 0; idy < all_stages[stage_num].size() ; idy++){
-            for(int idz = 0; idz < all_stages[stage_num][idy].size(); idz++){
-                ofSetColor(255, 255, 255);
-                if(all_stages[stage_num][idy][idz].weight > 0.0){
-                    
-                    ofFill();
-                } else {
-                    ofNoFill();
-                }
-                ofDrawRectangle((float)all_stages[stage_num][idy][idz].x,(float)all_stages[stage_num][idy][idz].y,(float)all_stages[stage_num][idy][idz].w,(float)all_stages[stage_num][idy][idz].h);
-            }
+    ofColor c = ofColor(0);
+    int color_split = 0;
+    int color_change = 255 / all_stages[stage_num].size();
+    for(int idy = 0; idy < all_stages[stage_num].size() ; idy++){
+        c.setHsb(color_split, 255,255);
+        for(int idz = 0; idz < all_stages[stage_num][idy].size(); idz++){
             
+            ofSetColor(c);
+//            if(all_stages[stage_num][idy][idz].weight > 0.0){
+//                
+//                ofFill();
+//            } else {
+//                ofNoFill();
+//            }
+            ofNoFill();
+            ofDrawRectangle((float)all_stages[stage_num][idy][idz].x,(float)all_stages[stage_num][idy][idz].y,(float)all_stages[stage_num][idy][idz].w,(float)all_stages[stage_num][idy][idz].h);
         }
-        
+        color_split += color_change;
     }
 }
 //------------------------------------------------------------------------------------------------//

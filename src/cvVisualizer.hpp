@@ -31,7 +31,7 @@ public:
     void update(ofImage img);
     void draw();
     void drawStage(int stage_num);
-    int numStages; 
+    int numStages();
     
     cv::FileStorage fs;
     cv::FileNode cascade,stages,features, feature_trees;
